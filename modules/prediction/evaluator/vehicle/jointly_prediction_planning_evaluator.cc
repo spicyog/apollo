@@ -24,6 +24,7 @@
 #include "modules/prediction/common/prediction_map.h"
 #include "modules/prediction/common/prediction_system_gflags.h"
 #include "modules/prediction/common/prediction_util.h"
+#include "modules/prediction/container/adc_trajectory/adc_trajectory_container.h"
 
 namespace apollo {
 namespace prediction {
@@ -31,16 +32,26 @@ namespace prediction {
 using apollo::common::TrajectoryPoint;
 using apollo::common::math::Vec2d;
 
-JointlyPredicionPlanningEvaluator::JointlyPredicionPlanningEvaluator(SemanticMap* semantic_map)
+JointlyPredictionPlanningEvaluator::JointlyPredictionPlanningEvaluator(
+    SemanticMap* semantic_map)
     : device_(torch::kCPU), semantic_map_(semantic_map) {
-  evaluator_type_ = ObstacleConf::SEMANTIC_LSTM_EVALUATOR;
+  evaluator_type_ = ObstacleConf::JOINTLY_PREDICTION_PLANNING_EVALUATOR;
   LoadModel();
 }
 
-void JointlyPredicionPlanningEvaluator::Clear() {}
+void JointlyPredictionPlanningEvaluator::Clear() {}
 
-bool JointlyPredicionPlanningEvaluator::Evaluate(Obstacle* obstacle_ptr,
+bool JointlyPredictionPlanningEvaluator::Evaluate(Obstacle* obstacle_ptr,
                                      ObstaclesContainer* obstacles_container) {
+  const ADCTrajectoryContainer* adc_trajectory_container;
+  Evaluate(adc_trajectory_container, obstacle_ptr, obstacles_container);
+  return true;
+}
+
+bool JointlyPredictionPlanningEvaluator::Evaluate(
+      const ADCTrajectoryContainer* adc_trajectory_container,
+      Obstacle* obstacle_ptr,
+      ObstaclesContainer* obstacles_container) {
   omp_set_num_threads(1);
 
   obstacle_ptr->SetEvaluatorType(evaluator_type_);
@@ -63,6 +74,10 @@ bool JointlyPredicionPlanningEvaluator::Evaluate(Obstacle* obstacle_ptr,
   if (!semantic_map_->GetMapById(id, &feature_map)) {
     return false;
   }
+  if (adc_trajectory_container == nullptr) {
+    AERROR << "Null adc trajectory container";
+    return false;
+  }
   // Process the feature_map
   cv::cvtColor(feature_map, feature_map, cv::COLOR_BGR2RGB);
   cv::Mat img_float;
@@ -74,25 +89,65 @@ bool JointlyPredicionPlanningEvaluator::Evaluate(Obstacle* obstacle_ptr,
   img_tensor[0][2] = img_tensor[0][2].sub(0.406).div(0.225);
 
   // Extract features of pos_history
-  std::vector<std::pair<double, double>> pos_history(20, {0.0, 0.0});
+  std::vector<std::pair<double, double>> pos_history(10, {0.0, 0.0});
   if (!ExtractObstacleHistory(obstacle_ptr, &pos_history)) {
     ADEBUG << "Obstacle [" << id << "] failed to extract obstacle history";
     return false;
   }
   // Process obstacle_history
-  // TODO(Hongyi): move magic numbers to parameters and gflags
-  torch::Tensor obstacle_pos = torch::zeros({1, 20, 2});
-  torch::Tensor obstacle_pos_step = torch::zeros({1, 20, 2});
-  for (int i = 0; i < 20; ++i) {
-    obstacle_pos[0][19 - i][0] = pos_history[i].first;
-    obstacle_pos[0][19 - i][1] = pos_history[i].second;
-    if (i == 19 || (i > 0 && pos_history[i].first == 0.0)) {
+  torch::Tensor obstacle_pos = torch::zeros({1, 10, 2});
+  torch::Tensor obstacle_pos_step = torch::zeros({1, 10, 2});
+  for (int i = 0; i < 10; ++i) {
+    obstacle_pos[0][9 - i][0] = pos_history[i].first;
+    obstacle_pos[0][9 - i][1] = pos_history[i].second;
+    if (i == 9 || (i > 0 && pos_history[i].first == 0.0)) {
       break;
     }
-    obstacle_pos_step[0][19 - i][0] =
+    obstacle_pos_step[0][9 - i][0] =
         pos_history[i].first - pos_history[i + 1].first;
-    obstacle_pos_step[0][19 - i][1] =
+    obstacle_pos_step[0][9 - i][1] =
         pos_history[i].second - pos_history[i + 1].second;
+  }
+
+  // Extract features of ADC trajectory
+  std::vector<std::pair<double, double>> adc_traj_curr_pos(10, {0.0, 0.0});
+  if (!ExtractADCTrajectory(adc_trajectory_container,
+          obstacle_ptr, &adc_traj_curr_pos)) {
+    ADEBUG << "Failed to extract adc trajectory";
+    return false;
+  }
+  // Process ADC trajectory
+  torch::Tensor adc_trajectory = torch::zeros({1, 10, 6});
+  const auto& adc_traj = adc_trajectory_container->adc_trajectory();
+  size_t traj_points_num = adc_traj.trajectory_point().size();
+  for (size_t i = 0; i < 10; ++i) {
+    if (i > traj_points_num - 1) {
+      adc_trajectory[0][i][0] =
+          adc_traj_curr_pos[traj_points_num].first;
+      adc_trajectory[0][i][1] =
+          adc_traj_curr_pos[traj_points_num].second;
+      adc_trajectory[0][i][2] =
+          adc_traj.trajectory_point(traj_points_num).path_point().theta();
+      adc_trajectory[0][i][3] =
+          adc_traj.trajectory_point(traj_points_num).v();
+      adc_trajectory[0][i][4] =
+          adc_traj.trajectory_point(traj_points_num).a();
+      adc_trajectory[0][i][5] =
+          adc_traj.trajectory_point(traj_points_num).path_point().kappa();
+    } else {
+      adc_trajectory[0][i][0] =
+          adc_traj_curr_pos[i].first;
+      adc_trajectory[0][i][1] =
+          adc_traj_curr_pos[i].second;
+      adc_trajectory[0][i][2] =
+          adc_traj.trajectory_point(i).path_point().theta();
+      adc_trajectory[0][i][3] =
+          adc_traj.trajectory_point(i).v();
+      adc_trajectory[0][i][4] =
+          adc_traj.trajectory_point(i).a();
+      adc_trajectory[0][i][5] =
+          adc_traj.trajectory_point(i).path_point().kappa();
+    }
   }
 
   // Build input features for torch
@@ -101,20 +156,16 @@ bool JointlyPredicionPlanningEvaluator::Evaluate(Obstacle* obstacle_ptr,
   torch_inputs.push_back(c10::ivalue::Tuple::create(
       {std::move(img_tensor.to(device_)), std::move(obstacle_pos.to(device_)),
        std::move(obstacle_pos_step.to(device_))}));
+  torch_inputs.push_back(c10::ivalue::Tuple::create(
+      {std::move(adc_trajectory.to(device_))}));
 
   // Compute pred_traj
   std::vector<double> pred_traj;
 
   auto start_time = std::chrono::system_clock::now();
   at::Tensor torch_output_tensor = torch_default_output_tensor_;
-  if (obstacle_ptr->IsPedestrian()) {
-    torch_output_tensor = torch_pedestrian_model_.forward(torch_inputs)
-                              .toTensor()
-                              .to(torch::kCPU);
-  } else {
-    torch_output_tensor =
-        torch_vehicle_model_.forward(torch_inputs).toTensor().to(torch::kCPU);
-  }
+  torch_output_tensor =
+      torch_vehicle_model_.forward(torch_inputs).toTensor().to(torch::kCPU);
 
   auto end_time = std::chrono::system_clock::now();
   std::chrono::duration<double> diff = end_time - start_time;
@@ -128,7 +179,7 @@ bool JointlyPredicionPlanningEvaluator::Evaluate(Obstacle* obstacle_ptr,
   Trajectory* trajectory = latest_feature_ptr->add_predicted_trajectory();
   trajectory->set_probability(1.0);
 
-  for (int i = 0; i < 30; ++i) {
+  for (int i = 0; i < 10; ++i) {
     double prev_x = pos_x;
     double prev_y = pos_y;
     if (i > 0) {
@@ -148,50 +199,7 @@ bool JointlyPredicionPlanningEvaluator::Evaluate(Obstacle* obstacle_ptr,
     point->mutable_path_point()->set_x(point_x);
     point->mutable_path_point()->set_y(point_y);
 
-    if (torch_output_tensor.sizes()[2] == 5) {
-      double sigma_xr = std::abs(static_cast<double>(torch_output[0][i][2]));
-      double sigma_yr = std::abs(static_cast<double>(torch_output[0][i][3]));
-      double corr_r = static_cast<double>(torch_output[0][i][4]);
-      Eigen::Matrix2d cov_matrix_r;
-      cov_matrix_r(0, 0) = sigma_xr * sigma_xr;
-      cov_matrix_r(0, 1) = corr_r * sigma_xr * sigma_yr;
-      cov_matrix_r(1, 0) = corr_r * sigma_xr * sigma_yr;
-      cov_matrix_r(1, 1) = sigma_yr * sigma_yr;
-
-      Eigen::Matrix2d rotation_matrix;
-      rotation_matrix(0, 0) = std::cos(heading);
-      rotation_matrix(0, 1) = -std::sin(heading);
-      rotation_matrix(1, 0) = std::sin(heading);
-      rotation_matrix(1, 1) = std::cos(heading);
-
-      Eigen::Matrix2d cov_matrix;
-      cov_matrix =
-          rotation_matrix * cov_matrix_r * (rotation_matrix.transpose());
-      double sigma_x = std::sqrt(std::abs(cov_matrix(0, 0)));
-      double sigma_y = std::sqrt(std::abs(cov_matrix(1, 1)));
-      double corr = cov_matrix(0, 1) / (sigma_x + FLAGS_double_precision) /
-                    (sigma_y + FLAGS_double_precision);
-
-      point->mutable_gaussian_info()->set_sigma_x(sigma_x);
-      point->mutable_gaussian_info()->set_sigma_y(sigma_y);
-      point->mutable_gaussian_info()->set_correlation(corr);
-
-      if (i > 0) {
-        Eigen::EigenSolver<Eigen::Matrix2d> eigen_solver(cov_matrix);
-        const auto& eigen_values = eigen_solver.eigenvalues();
-        const auto& eigen_vectors = eigen_solver.eigenvectors();
-        point->mutable_gaussian_info()->set_ellipse_a(
-            std::sqrt(std::abs(eigen_values(0).real())));
-        point->mutable_gaussian_info()->set_ellipse_b(
-            std::sqrt(std::abs(eigen_values(1).real())));
-        double cos_theta_a = eigen_vectors(0, 0).real();
-        double sin_theta_a = eigen_vectors(1, 0).real();
-        point->mutable_gaussian_info()->set_theta_a(
-            std::atan2(sin_theta_a, cos_theta_a));
-      }
-    }
-
-    if (i < 10) {  // use origin heading for the first second
+    if (i < 5) {  // use origin heading for the first second
       point->mutable_path_point()->set_theta(
           latest_feature_ptr->velocity_heading());
     } else {
@@ -216,15 +224,15 @@ bool JointlyPredicionPlanningEvaluator::Evaluate(Obstacle* obstacle_ptr,
   return true;
 }
 
-bool JointlyPredicionPlanningEvaluator::ExtractObstacleHistory(
+bool JointlyPredictionPlanningEvaluator::ExtractObstacleHistory(
     Obstacle* obstacle_ptr,
     std::vector<std::pair<double, double>>* pos_history) {
-  pos_history->resize(20, {0.0, 0.0});
+  pos_history->resize(10, {0.0, 0.0});
   const Feature& obs_curr_feature = obstacle_ptr->latest_feature();
   double obs_curr_heading = obs_curr_feature.velocity_heading();
   std::pair<double, double> obs_curr_pos = std::make_pair(
       obs_curr_feature.position().x(), obs_curr_feature.position().y());
-  for (std::size_t i = 0; i < obstacle_ptr->history_size() && i < 20; ++i) {
+  for (std::size_t i = 0; i < obstacle_ptr->history_size() && i < 10; ++i) {
     const Feature& feature = obstacle_ptr->feature(i);
     if (!feature.IsInitialized()) {
       break;
@@ -236,36 +244,54 @@ bool JointlyPredicionPlanningEvaluator::ExtractObstacleHistory(
   return true;
 }
 
-void JointlyPredicionPlanningEvaluator::LoadModel() {
+bool JointlyPredictionPlanningEvaluator::ExtractADCTrajectory(
+    const ADCTrajectoryContainer* adc_trajectory_container,
+    Obstacle* obstacle_ptr,
+    std::vector<std::pair<double, double>>* adc_traj_curr_pos) {
+  adc_traj_curr_pos->resize(10, {0.0, 0.0});
+  const Feature& obs_curr_feature = obstacle_ptr->latest_feature();
+  double obs_curr_heading = obs_curr_feature.velocity_heading();
+  std::pair<double, double> obs_curr_pos = std::make_pair(
+      obs_curr_feature.position().x(), obs_curr_feature.position().y());
+  const auto& adc_trajectory =
+      adc_trajectory_container->adc_trajectory();
+  size_t adc_traj_points_num = adc_trajectory.trajectory_point().size();
+  for (size_t i = 0; i < adc_traj_points_num && i < 10; ++i) {
+    adc_traj_curr_pos->at(i) = WorldCoordToObjCoord(
+        std::make_pair(adc_trajectory.trajectory_point(i).path_point().x(),
+        adc_trajectory.trajectory_point(i).path_point().y()),
+        obs_curr_pos, obs_curr_heading);
+  }
+  return true;
+}
+
+void JointlyPredictionPlanningEvaluator::LoadModel() {
   if (FLAGS_use_cuda && torch::cuda::is_available()) {
     ADEBUG << "CUDA is available";
     device_ = torch::Device(torch::kCUDA);
     torch_vehicle_model_ =
-        torch::jit::load(FLAGS_torch_vehicle_semantic_lstm_file, device_);
-    torch_pedestrian_model_ =
-        torch::jit::load(FLAGS_torch_pedestrian_semantic_lstm_file, device_);
+        torch::jit::load(FLAGS_torch_vehicle_jointly_model_file, device_);
   } else {
     torch_vehicle_model_ =
-        torch::jit::load(FLAGS_torch_vehicle_semantic_lstm_cpu_file, device_);
-    torch_pedestrian_model_ = torch::jit::load(
-        FLAGS_torch_pedestrian_semantic_lstm_cpu_file, device_);
+        torch::jit::load(FLAGS_torch_vehicle_jointly_model_cpu_file, device_);
   }
   torch::set_num_threads(1);
 
   // Fake intput for the first frame
   torch::Tensor img_tensor = torch::zeros({1, 3, 224, 224});
-  torch::Tensor obstacle_pos = torch::zeros({1, 20, 2});
-  torch::Tensor obstacle_pos_step = torch::zeros({1, 20, 2});
+  torch::Tensor obstacle_pos = torch::zeros({1, 10, 2});
+  torch::Tensor obstacle_pos_step = torch::zeros({1, 10, 2});
+  torch::Tensor adc_trajectory = torch::zeros({1, 10, 6});
   std::vector<torch::jit::IValue> torch_inputs;
 
   torch_inputs.push_back(c10::ivalue::Tuple::create(
       {std::move(img_tensor.to(device_)), std::move(obstacle_pos.to(device_)),
        std::move(obstacle_pos_step.to(device_))}));
+  torch_inputs.push_back(c10::ivalue::Tuple::create(
+      {std::move(adc_trajectory.to(device_))}));
   // Run one inference to avoid very slow first inference later
   torch_default_output_tensor_ =
       torch_vehicle_model_.forward(torch_inputs).toTensor().to(torch::kCPU);
-  torch_default_output_tensor_ =
-      torch_pedestrian_model_.forward(torch_inputs).toTensor().to(torch::kCPU);
 }
 
 }  // namespace prediction

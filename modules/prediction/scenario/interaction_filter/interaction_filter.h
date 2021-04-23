@@ -38,24 +38,39 @@ class InteractionFilter {
   explicit InteractionFilter(
       const std::shared_ptr<ContainerManager>& container_manager);
 
+  /**
+   * @brief Assign interactive tag for vehicle type obstacles which are close to ADC
+   */
   void AssignInteractiveTag();
 
  private:
+   /**
+   * @brief Assign interactive tag for obstacles in junction
+   */
   void AssignInteractiveTagInJunction(const Obstacle& ego_vehicle,
                                     ObstaclesContainer* obstacles_container,
                                     const std::string& junction_id);
 
+  /**
+   * @brief Assign interactive tag for obstacles in the cruising lane 
+   * which are in front of ADC
+   */
   void AssignInteractiveTagCruiseKeepLane(
       const Obstacle& ego_vehicle, ObstaclesContainer* obstacles_container);
 
+  /**
+   * @brief Assign interactive tag for obstacles in the target lane
+   * which are close to ADC(include backward obstacles) during lane change
+   */
   void AssignInteractiveTagCruiseChangeLane(
       const Obstacle& ego_vehicle, ObstaclesContainer* obstacles_container);
 
+  /**
+   * @brief Assign interactive tag for obstacles that may interact with ADC 
+   * according to the ADC's trajectory
+   */
   void AssignInteractiveTagByEgoReferenceLine(
       const Obstacle& ego_vehicle, ObstaclesContainer* obstacles_container);
-
-//   void AssignCautionLevelPedestrianInFront(
-//       const Obstacle& ego_vehicle, ObstaclesContainer* obstacles_container);
 
   void RankingInteractiveTagObstacles(const Obstacle& ego_vehicle,
                                     ObstaclesContainer* obstacles_container);

@@ -32,8 +32,8 @@
 #include "modules/prediction/evaluator/evaluator_manager.h"
 #include "modules/prediction/predictor/predictor_manager.h"
 #include "modules/prediction/proto/offline_features.pb.h"
-#include "modules/prediction/scenario/prioritization/obstacles_prioritizer.h"
 #include "modules/prediction/scenario/interaction_filter/interaction_filter.h"
+#include "modules/prediction/scenario/prioritization/obstacles_prioritizer.h"
 #include "modules/prediction/scenario/right_of_way/right_of_way.h"
 #include "modules/prediction/util/data_extraction.h"
 

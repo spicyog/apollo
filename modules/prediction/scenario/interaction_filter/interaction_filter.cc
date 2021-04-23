@@ -59,7 +59,7 @@ int NearestFrontObstacleIdOnLaneSequence(const LaneSequence& lane_sequence) {
   double smallest_relative_s = std::numeric_limits<double>::max();
   for (const auto& nearby_obs : lane_sequence.nearby_obstacle()) {
     if (nearby_obs.s() < 0.0 ||
-        nearby_obs.s() > FLAGS_caution_search_distance_ahead) {
+        nearby_obs.s() > FLAGS_interaction_search_distance_ahead) {
       continue;
     }
     if (nearby_obs.s() < smallest_relative_s) {
@@ -75,7 +75,7 @@ int NearestBackwardObstacleIdOnLaneSequence(const LaneSequence& lane_sequence) {
   double smallest_relative_s = std::numeric_limits<double>::max();
   for (const auto& nearby_obs : lane_sequence.nearby_obstacle()) {
     if (nearby_obs.s() > 0.0 ||
-        nearby_obs.s() < -FLAGS_caution_search_distance_backward) {
+        nearby_obs.s() < -FLAGS_interaction_search_distance_backward) {
       continue;
     }
     if (-nearby_obs.s() < smallest_relative_s) {
@@ -121,10 +121,7 @@ void InteractionFilter::AssignInteractiveTag() {
   AssignInteractiveTagCruiseKeepLane(*ego_vehicle, obstacles_container);
   AssignInteractiveTagCruiseChangeLane(*ego_vehicle, obstacles_container);
   AssignInteractiveTagByEgoReferenceLine(*ego_vehicle, obstacles_container);
-  // if (FLAGS_enable_all_pedestrian_caution_in_front) {
-  //   AssignCautionLevelPedestrianInFront(*ego_vehicle, obstacles_container);
-  // }
-  if (FLAGS_enable_rank_caution_obstacles) {
+  if (FLAGS_enable_rank_interactive_obstacles) {
     RankingInteractiveTagObstacles(*ego_vehicle, obstacles_container);
   }
 }
@@ -132,7 +129,6 @@ void InteractionFilter::AssignInteractiveTag() {
 void InteractionFilter::AssignInteractiveTagInJunction(
     const Obstacle& ego_vehicle, ObstaclesContainer* obstacles_container,
     const std::string& junction_id) {
-  // TODO(Hongyi): get current junction_id from Storytelling
   const auto& obstacle_ids =
       obstacles_container->curr_frame_movable_obstacle_ids();
   for (const int obstacle_id : obstacle_ids) {
@@ -142,7 +138,8 @@ void InteractionFilter::AssignInteractiveTagInJunction(
       continue;
     }
     if (obstacle_ptr->IsInJunction(junction_id)) {
-      SetInteractiveIfCloseToEgo(ego_vehicle, FLAGS_caution_distance_threshold,
+      SetInteractiveIfCloseToEgo(ego_vehicle,
+                             FLAGS_interaction_distance_threshold,
                              obstacle_ptr);
     }
   }
@@ -164,7 +161,8 @@ void InteractionFilter::AssignInteractiveTagCruiseKeepLane(
       AERROR << "Obstacle [" << nearest_front_obstacle_id << "] Not found";
       continue;
     }
-    SetInteractiveIfCloseToEgo(ego_vehicle, FLAGS_caution_distance_threshold,
+    SetInteractiveIfCloseToEgo(ego_vehicle,
+                           FLAGS_interaction_distance_threshold,
                            obstacle_ptr);
   }
 }
@@ -189,7 +187,8 @@ void InteractionFilter::AssignInteractiveTagCruiseChangeLane(
         AERROR << "Obstacle [" << nearest_front_obstacle_id << "] Not found";
         continue;
       }
-      SetInteractiveIfCloseToEgo(ego_vehicle, FLAGS_caution_distance_threshold,
+      SetInteractiveIfCloseToEgo(ego_vehicle,
+                             FLAGS_interaction_distance_threshold,
                              obstacle_ptr);
     } else if (IsLaneSequenceInReferenceLine(lane_sequence,
                                              ego_trajectory_container)) {
@@ -201,7 +200,8 @@ void InteractionFilter::AssignInteractiveTagCruiseChangeLane(
         Obstacle* front_obstacle_ptr =
             obstacles_container->GetObstacle(nearest_front_obstacle_id);
         if (front_obstacle_ptr != nullptr) {
-          SetInteractiveIfCloseToEgo(ego_vehicle, FLAGS_caution_distance_threshold,
+          SetInteractiveIfCloseToEgo(ego_vehicle,
+                                 FLAGS_interaction_distance_threshold,
                                  front_obstacle_ptr);
         }
       }
@@ -209,7 +209,8 @@ void InteractionFilter::AssignInteractiveTagCruiseChangeLane(
         Obstacle* backward_obstacle_ptr =
             obstacles_container->GetObstacle(nearest_backward_obstacle_id);
         if (backward_obstacle_ptr != nullptr) {
-          SetInteractiveIfCloseToEgo(ego_vehicle, FLAGS_caution_distance_threshold,
+          SetInteractiveIfCloseToEgo(ego_vehicle,
+                                 FLAGS_interaction_distance_threshold,
                                  backward_obstacle_ptr);
         }
       }
@@ -289,37 +290,12 @@ void InteractionFilter::AssignInteractiveTagByEgoReferenceLine(
     }
     AssignInteractiveByOverlap(ego_vehicle, lane_info_ptr, &visited_lanes,
                            obstacles_container);
-    if (accumulated_s > FLAGS_caution_search_distance_ahead + ego_vehicle_s) {
+    if (accumulated_s >
+        FLAGS_interaction_search_distance_ahead + ego_vehicle_s) {
       break;
     }
   }
 }
-
-// void InteractionFilter::AssignCautionLevelPedestrianInFront(
-//     const Obstacle& ego_vehicle, ObstaclesContainer* obstacles_container) {
-//   const Point3D& ego_position = ego_vehicle.latest_feature().position();
-//   double ego_heading = ego_vehicle.latest_feature().theta();
-//   const auto& obstacle_ids =
-//       obstacles_container->curr_frame_movable_obstacle_ids();
-//   for (const int obstacle_id : obstacle_ids) {
-//     Obstacle* obstacle_ptr = obstacles_container->GetObstacle(obstacle_id);
-//     if (!obstacle_ptr->IsPedestrian() || obstacle_ptr->history_size() == 0) {
-//       continue;
-//     }
-//     const Feature& obs_feature = obstacle_ptr->latest_feature();
-//     double obs_x = obs_feature.position().x();
-//     double obs_y = obs_feature.position().y();
-//     double diff_x = obs_x - ego_position.x();
-//     double diff_y = obs_y - ego_position.y();
-//     double inner_prod =
-//         std::cos(ego_heading) * diff_x + std::sin(ego_heading) * diff_y;
-//     if (inner_prod < 0.0) {
-//       continue;
-//     }
-//     SetCautionIfCloseToEgo(ego_vehicle, FLAGS_caution_distance_threshold,
-//                            obstacle_ptr);
-//   }
-// }
 
 void InteractionFilter::RankingInteractiveTagObstacles(
     const Obstacle& ego_vehicle, ObstaclesContainer* obstacles_container) {
@@ -333,7 +309,7 @@ void InteractionFilter::RankingInteractiveTagObstacles(
       AERROR << "Obstacle [" << obstacle_id << "] Not found";
       continue;
     }
-    if (!obstacle_ptr->IsCaution()) { ////IS CAUTION 
+    if (!obstacle_ptr->IsInteractiveObstacle()) {
       continue;
     }
     const Point3D& obstacle_position =
@@ -343,10 +319,11 @@ void InteractionFilter::RankingInteractiveTagObstacles(
     interactive_obstacle_queue.push({distance, obstacle_ptr});
   }
   while (static_cast<int>(interactive_obstacle_queue.size()) >
-         FLAGS_caution_obs_max_nums) {
+         FLAGS_interactive_obs_max_nums) {
     Obstacle* obstacle_ptr = interactive_obstacle_queue.top().second;
-    obstacle_ptr->mutable_latest_feature()->mutable_interactive_tag()->set_interactive_tag(
-        ObstacleInteractiveTag::INTERACTION);
+    obstacle_ptr->mutable_latest_feature()->
+                  mutable_interactive_tag()->set_interactive_tag(
+                  ObstacleInteractiveTag::INTERACTION);
     interactive_obstacle_queue.pop();
   }
 }
@@ -355,7 +332,7 @@ void InteractionFilter::AssignInteractiveByMerge(
     const Obstacle& ego_vehicle, std::shared_ptr<const LaneInfo> lane_info_ptr,
     std::unordered_set<std::string>* const visited_lanes,
     ObstaclesContainer* obstacles_container) {
-  SetInteractiveBackward(FLAGS_caution_search_distance_backward_for_merge,
+  SetInteractiveBackward(FLAGS_interaction_search_distance_backward_for_merge,
                      ego_vehicle, lane_info_ptr, visited_lanes,
                      obstacles_container);
 }
@@ -391,7 +368,7 @@ void InteractionFilter::AssignInteractiveByOverlap(
       double ahead_s = overlap_lane_ptr->total_length() -
                        object.lane_overlap_info().start_s();
       SetInteractiveBackward(
-          ahead_s + FLAGS_caution_search_distance_backward_for_overlap,
+          ahead_s + FLAGS_interaction_search_distance_backward_for_overlap,
           ego_vehicle, overlap_lane_ptr, visited_lanes, obstacles_container);
     }
   }
@@ -435,7 +412,8 @@ void InteractionFilter::SetInteractiveBackward(
         AERROR << "Obstacle [" << obstacle_id << "] Not found";
         continue;
       }
-      SetInteractiveIfCloseToEgo(ego_vehicle, FLAGS_caution_distance_threshold,
+      SetInteractiveIfCloseToEgo(ego_vehicle,
+                             FLAGS_interaction_distance_threshold,
                              obstacle_ptr);
       continue;
     }
@@ -462,7 +440,9 @@ void InteractionFilter::SetInteractiveIfCloseToEgo(
   double diff_x = obstacle_position.x() - ego_position.x();
   double diff_y = obstacle_position.y() - ego_position.y();
   double distance = std::hypot(diff_x, diff_y);
-  if (distance < distance_threshold) {
+  // Add interactive tag only for vehicles
+  if (distance < distance_threshold &&
+      obstacle_ptr->latest_feature().type() == PerceptionObstacle::VEHICLE) {
     obstacle_ptr->SetInteractiveTag();
   }
 }

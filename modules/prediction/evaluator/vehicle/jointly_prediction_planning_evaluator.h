@@ -24,22 +24,23 @@
 #include "modules/prediction/evaluator/evaluator.h"
 #include "torch/extension.h"
 #include "torch/script.h"
+#include "modules/prediction/container/container_manager.h"
 
 namespace apollo {
 namespace prediction {
 
-class JointlyPredicionPlanningEvaluator : public Evaluator {
+class JointlyPredictionPlanningEvaluator : public Evaluator {
  public:
   /**
    * @brief Constructor
    */
-  JointlyPredicionPlanningEvaluator() = delete;
-  explicit JointlyPredicionPlanningEvaluator(SemanticMap* semantic_map);
+  JointlyPredictionPlanningEvaluator() = delete;
+  explicit JointlyPredictionPlanningEvaluator(SemanticMap* semantic_map);
 
   /**
    * @brief Destructor
    */
-  virtual ~JointlyPredicionPlanningEvaluator() = default;
+  virtual ~JointlyPredictionPlanningEvaluator() = default;
 
   /**
    * @brief Clear obstacle feature map
@@ -54,6 +55,17 @@ class JointlyPredicionPlanningEvaluator : public Evaluator {
   bool Evaluate(Obstacle* obstacle_ptr,
                 ObstaclesContainer* obstacles_container) override;
 
+
+  /**
+   * @brief Override Evaluate
+   * @param ADC trajectory container
+   * @param Obstacle pointer
+   * @param Obstacles container
+   */
+  bool Evaluate(const ADCTrajectoryContainer* adc_trajectory_container,
+                Obstacle* obstacle_ptr,
+                ObstaclesContainer* obstacles_container) override;
+
   /**
    * @brief Extract obstacle history
    * @param Obstacle pointer
@@ -64,9 +76,21 @@ class JointlyPredicionPlanningEvaluator : public Evaluator {
       std::vector<std::pair<double, double>>* pos_history);
 
   /**
+   * @brief Extract adc trajectory and convert world coord to obstacle coord
+   * @param Obstacle pointer
+   *        Feature container in a vector for receiving the obstacle history
+   */
+  bool ExtractADCTrajectory(
+      const ADCTrajectoryContainer* adc_trajectory_container,
+      Obstacle* obstacle_ptr,
+      std::vector<std::pair<double, double>>* acd_traj_curr_pos);
+
+  /**
    * @brief Get the name of evaluator.
    */
-  std::string GetName() override { return "SEMANTIC_LSTM_EVALUATOR"; }
+  std::string GetName() override {
+    return "JOINTLY_PREDICTION_PLANNING_EVALUATOR";
+  }
 
  private:
   /**
@@ -76,7 +100,6 @@ class JointlyPredicionPlanningEvaluator : public Evaluator {
 
  private:
   torch::jit::script::Module torch_vehicle_model_;
-  torch::jit::script::Module torch_pedestrian_model_;
   at::Tensor torch_default_output_tensor_;
   torch::Device device_;
   SemanticMap* semantic_map_;

@@ -233,7 +233,7 @@ class Obstacle {
    */
   void SetInteractiveTag();
 
-  bool IsInteraction() const;
+  bool IsInteractiveObstacle() const;
 
   void SetEvaluatorType(const ObstacleConf::EvaluatorType& evaluator_type);
 
