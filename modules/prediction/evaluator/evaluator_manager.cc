@@ -251,14 +251,18 @@ void EvaluatorManager::EvaluateObstacle(
   switch (obstacle->type()) {
     case PerceptionObstacle::VEHICLE: {
       if (obstacle->IsCaution() && !obstacle->IsSlow()) {
-        if (obstacle->IsNearJunction()) {
+        if (obstacle->IsInteractiveObstacle()) {
+          evaluator = GetEvaluator(interaction_evaluator_);
+          AINFO << "!!!!!interaction evaluator is on!!!!!!!";
+        } else if (obstacle->IsNearJunction()) {
           evaluator = GetEvaluator(vehicle_in_junction_caution_evaluator_);
+          AINFO << "!!!!!junction evaluator is on!!!!!!!";
         } else if (obstacle->IsOnLane()) {
           evaluator = GetEvaluator(vehicle_on_lane_caution_evaluator_);
-        } else if (obstacle->IsInteractiveObstacle()) {
-          evaluator = GetEvaluator(interaction_evaluator_);
+          AINFO << "!!!!!on lane evaluator is on!!!!!!!";
         } else {
           evaluator = GetEvaluator(vehicle_default_caution_evaluator_);
+          AINFO << "!!!!!default evaluator is on!!!!!!!";
         }
         CHECK_NOTNULL(evaluator);
         // Evaluate and break if success

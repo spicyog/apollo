@@ -153,11 +153,11 @@ bool JointlyPredictionPlanningEvaluator::Evaluate(
   // Build input features for torch
   std::vector<torch::jit::IValue> torch_inputs;
 
-  torch_inputs.push_back(c10::ivalue::Tuple::create(
+  auto X_value = c10::ivalue::Tuple::create(
       {std::move(img_tensor.to(device_)), std::move(obstacle_pos.to(device_)),
-       std::move(obstacle_pos_step.to(device_))}));
+       std::move(obstacle_pos_step.to(device_))});
   torch_inputs.push_back(c10::ivalue::Tuple::create(
-      {std::move(adc_trajectory.to(device_))}));
+      {X_value, std::move(adc_trajectory.to(device_))}));
 
   // Compute pred_traj
   std::vector<double> pred_traj;
@@ -284,11 +284,11 @@ void JointlyPredictionPlanningEvaluator::LoadModel() {
   torch::Tensor adc_trajectory = torch::zeros({1, 10, 6});
   std::vector<torch::jit::IValue> torch_inputs;
 
-  torch_inputs.push_back(c10::ivalue::Tuple::create(
+  auto X_value = c10::ivalue::Tuple::create(
       {std::move(img_tensor.to(device_)), std::move(obstacle_pos.to(device_)),
-       std::move(obstacle_pos_step.to(device_))}));
+       std::move(obstacle_pos_step.to(device_))});
   torch_inputs.push_back(c10::ivalue::Tuple::create(
-      {std::move(adc_trajectory.to(device_))}));
+      {X_value, std::move(adc_trajectory.to(device_))}));
   // Run one inference to avoid very slow first inference later
   torch_default_output_tensor_ =
       torch_vehicle_model_.forward(torch_inputs).toTensor().to(torch::kCPU);
