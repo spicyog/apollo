@@ -36,7 +36,9 @@ JointlyPredictionPlanningEvaluator::JointlyPredictionPlanningEvaluator(
     SemanticMap* semantic_map)
     : device_(torch::kCPU), semantic_map_(semantic_map) {
   evaluator_type_ = ObstacleConf::JOINTLY_PREDICTION_PLANNING_EVALUATOR;
+  AINFO << "BEGIN TO LOAD MODEL";
   LoadModel();
+  AINFO << "LOAD MODEL IS DONE";
 }
 
 void JointlyPredictionPlanningEvaluator::Clear() {}
@@ -269,9 +271,11 @@ void JointlyPredictionPlanningEvaluator::LoadModel() {
   if (FLAGS_use_cuda && torch::cuda::is_available()) {
     ADEBUG << "CUDA is available";
     device_ = torch::Device(torch::kCUDA);
+    AINFO << "BEGIN TO LOAD GPU MODEL";
     torch_vehicle_model_ =
         torch::jit::load(FLAGS_torch_vehicle_jointly_model_file, device_);
   } else {
+    AINFO << "BEGIN TO LOAD CPU MODEL";
     torch_vehicle_model_ =
         torch::jit::load(FLAGS_torch_vehicle_jointly_model_cpu_file, device_);
   }
@@ -284,6 +288,7 @@ void JointlyPredictionPlanningEvaluator::LoadModel() {
   torch::Tensor adc_trajectory = torch::zeros({1, 10, 6});
   std::vector<torch::jit::IValue> torch_inputs;
 
+  AINFO << "BEGIN TO CREATE INPUT";
   auto X_value = c10::ivalue::Tuple::create(
       {std::move(img_tensor.to(device_)), std::move(obstacle_pos.to(device_)),
        std::move(obstacle_pos_step.to(device_))});

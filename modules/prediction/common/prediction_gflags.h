@@ -45,6 +45,7 @@ DECLARE_double(surrounding_lane_search_radius);
 
 // Semantic Map
 DECLARE_double(base_image_half_range);
+DECLARE_bool(enable_draw_adc_trajectory);
 DECLARE_bool(img_show_semantic_map);
 
 // Scenario

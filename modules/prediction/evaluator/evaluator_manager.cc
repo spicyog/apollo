@@ -119,18 +119,19 @@ void EvaluatorManager::Init(const PredictionConf& config) {
 
   for (const auto& obstacle_conf : config.obstacle_conf()) {
     if (!obstacle_conf.has_obstacle_type()) {
-      AERROR << "Obstacle config [" << obstacle_conf.ShortDebugString()
+      AINFO << "Obstacle config [" << obstacle_conf.ShortDebugString()
              << "] has not defined obstacle type.";
       continue;
     }
 
     if (!obstacle_conf.has_evaluator_type()) {
-      ADEBUG << "Obstacle config [" << obstacle_conf.ShortDebugString()
+      AINFO << "Obstacle config [" << obstacle_conf.ShortDebugString()
              << "] has not defined evaluator type.";
       continue;
     }
 
     if (obstacle_conf.has_obstacle_status()) {
+      AINFO << "HAS OBSTACLE STATUS";
       switch (obstacle_conf.obstacle_type()) {
         case PerceptionObstacle::VEHICLE: {
           if (obstacle_conf.obstacle_status() == ObstacleConf::ON_LANE) {
@@ -176,6 +177,7 @@ void EvaluatorManager::Init(const PredictionConf& config) {
         }
       }
     } else if (obstacle_conf.has_interactive_tag()) {
+      AINFO << "INTERACTION WILL BE USED";
       interaction_evaluator_ = obstacle_conf.evaluator_type();
     }
   }
@@ -253,16 +255,12 @@ void EvaluatorManager::EvaluateObstacle(
       if (obstacle->IsCaution() && !obstacle->IsSlow()) {
         if (obstacle->IsInteractiveObstacle()) {
           evaluator = GetEvaluator(interaction_evaluator_);
-          AINFO << "!!!!!interaction evaluator is on!!!!!!!";
         } else if (obstacle->IsNearJunction()) {
           evaluator = GetEvaluator(vehicle_in_junction_caution_evaluator_);
-          AINFO << "!!!!!junction evaluator is on!!!!!!!";
         } else if (obstacle->IsOnLane()) {
           evaluator = GetEvaluator(vehicle_on_lane_caution_evaluator_);
-          AINFO << "!!!!!on lane evaluator is on!!!!!!!";
         } else {
           evaluator = GetEvaluator(vehicle_default_caution_evaluator_);
-          AINFO << "!!!!!default evaluator is on!!!!!!!";
         }
         CHECK_NOTNULL(evaluator);
         // Evaluate and break if success
