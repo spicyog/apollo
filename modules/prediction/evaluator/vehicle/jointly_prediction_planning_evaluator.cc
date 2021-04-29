@@ -1,5 +1,5 @@
 /******************************************************************************
- * Copyright 2019 The Apollo Authors. All Rights Reserved.
+ * Copyright 2021 The Apollo Authors. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,9 +36,7 @@ JointlyPredictionPlanningEvaluator::JointlyPredictionPlanningEvaluator(
     SemanticMap* semantic_map)
     : device_(torch::kCPU), semantic_map_(semantic_map) {
   evaluator_type_ = ObstacleConf::JOINTLY_PREDICTION_PLANNING_EVALUATOR;
-  AINFO << "BEGIN TO LOAD MODEL";
   LoadModel();
-  AINFO << "LOAD MODEL IS DONE";
 }
 
 void JointlyPredictionPlanningEvaluator::Clear() {}
@@ -102,7 +100,7 @@ bool JointlyPredictionPlanningEvaluator::Evaluate(
   for (int i = 0; i < 10; ++i) {
     obstacle_pos[0][9 - i][0] = pos_history[i].first;
     obstacle_pos[0][9 - i][1] = pos_history[i].second;
-    if (i == 9 || (i > 0 && pos_history[i].first == 0.0)) {
+    if (i == 9 || (i > 0 && pos_history[i].first < 1.0e-10)) {
       break;
     }
     obstacle_pos_step[0][9 - i][0] =
@@ -271,11 +269,9 @@ void JointlyPredictionPlanningEvaluator::LoadModel() {
   if (FLAGS_use_cuda && torch::cuda::is_available()) {
     ADEBUG << "CUDA is available";
     device_ = torch::Device(torch::kCUDA);
-    AINFO << "BEGIN TO LOAD GPU MODEL";
     torch_vehicle_model_ =
         torch::jit::load(FLAGS_torch_vehicle_jointly_model_file, device_);
   } else {
-    AINFO << "BEGIN TO LOAD CPU MODEL";
     torch_vehicle_model_ =
         torch::jit::load(FLAGS_torch_vehicle_jointly_model_cpu_file, device_);
   }
@@ -288,7 +284,6 @@ void JointlyPredictionPlanningEvaluator::LoadModel() {
   torch::Tensor adc_trajectory = torch::zeros({1, 10, 6});
   std::vector<torch::jit::IValue> torch_inputs;
 
-  AINFO << "BEGIN TO CREATE INPUT";
   auto X_value = c10::ivalue::Tuple::create(
       {std::move(img_tensor.to(device_)), std::move(obstacle_pos.to(device_)),
        std::move(obstacle_pos_step.to(device_))});

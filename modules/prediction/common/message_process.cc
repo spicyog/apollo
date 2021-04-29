@@ -56,11 +56,8 @@ bool MessageProcess::Init(ContainerManager* container_manager,
                           PredictorManager* predictor_manager,
                           const PredictionConf& prediction_conf) {
   InitContainers(container_manager);
-  AINFO << "INIT CONTAINERS IS DONE";
   InitEvaluators(evaluator_manager, prediction_conf);
-  AINFO << "INIT EVALUATORS IS DONE";
   InitPredictors(predictor_manager, prediction_conf);
-  AINFO << "INIT PREDICTORES IS DONE";
 
   if (!FLAGS_use_navigation_mode && !PredictionMap::Ready()) {
     AERROR << "Map cannot be loaded.";
@@ -158,11 +155,9 @@ void MessageProcess::ContainerProcess(
   InteractionFilter interaction_filter(container_manager);
 
   // Ignore some obstacles
-  AINFO << "~~~~~~~~OBSTACLES PRIORITIZE STARTED~~~~~~~~~~~";
   obstacles_prioritizer.AssignIgnoreLevel();
 
   // Add interactive tag
-  AINFO << "~~~~~~~~INTERACTION FILTER STARTED~~~~~~~~~~";
   interaction_filter.AssignInteractiveTag();
 
   // Scenario analysis
@@ -192,9 +187,8 @@ void MessageProcess::OnPerception(
     EvaluatorManager* evaluator_manager, PredictorManager* predictor_manager,
     ScenarioManager* scenario_manager,
     PredictionObstacles* const prediction_obstacles) {
-  AINFO << "STEP 1 ENTER PREDICTION MAIN PROCESS, START TO PROCESS CONTAINER";    
   ContainerProcess(container_manager, perception_obstacles, scenario_manager);
-  AINFO << "FINISHED CONTAINER PROCESS";
+
   auto ptr_obstacles_container =
       container_manager->GetContainer<ObstaclesContainer>(
           AdapterConfig::PERCEPTION_OBSTACLES);
@@ -232,15 +226,14 @@ void MessageProcess::OnPerception(
   }
 
   // Make evaluations
-  AINFO << "STEP 2 START TO RUN EVALUATOR"; 
-  evaluator_manager->Run(ptr_obstacles_container);
+  evaluator_manager->Run(ptr_ego_trajectory_container,
+                         ptr_obstacles_container);
   if (FLAGS_prediction_offline_mode ==
           PredictionConstants::kDumpDataForLearning ||
       FLAGS_prediction_offline_mode == PredictionConstants::kDumpFrameEnv) {
     return;
   }
   // Make predictions
-  AINFO << "STEP3 START TO RUN PREDICTOR";
   predictor_manager->Run(perception_obstacles, ptr_ego_trajectory_container,
                          ptr_obstacles_container);
 

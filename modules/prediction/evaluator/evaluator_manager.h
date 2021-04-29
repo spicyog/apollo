@@ -66,7 +66,8 @@ class EvaluatorManager {
   /**
    * @brief Run evaluators
    */
-  void Run(ObstaclesContainer* obstacles_container);
+  void Run(const ADCTrajectoryContainer* adc_trajectory_container,
+           ObstaclesContainer* obstacles_container);
 
   void EvaluateObstacle(const ADCTrajectoryContainer* adc_trajectory_container,
                         Obstacle* obstacle,

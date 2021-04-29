@@ -65,18 +65,12 @@ void PredictionComponent::OfflineProcessFeatureProtoFile(
 }
 
 bool PredictionComponent::Init() {
-  AINFO << "~~~~~~~~PREDICTION INIT STARTED!~~~~~~~~~";
   component_start_time_ = Clock::NowInSeconds();
 
-  AINFO << "CONTAINER START 1111111111";
   container_manager_ = std::make_shared<ContainerManager>();
-  AINFO << "EVALUATOR START 2222222222";
   evaluator_manager_.reset(new EvaluatorManager());
-  AINFO << "PREDICTOR START 3333333333";
   predictor_manager_.reset(new PredictorManager());
-  AINFO << "SCENARIO START 44444444444";
   scenario_manager_.reset(new ScenarioManager());
-  AINFO << "RESET IS DONE";
 
   PredictionConf prediction_conf;
   if (!ComponentBase::GetProtoConfig(&prediction_conf)) {
@@ -84,15 +78,14 @@ bool PredictionComponent::Init() {
            << ComponentBase::ConfigFilePath();
     return false;
   }
-  AINFO << "Prediction config file is loaded into: "
+  ADEBUG << "Prediction config file is loaded into: "
          << prediction_conf.ShortDebugString();
 
   if (!MessageProcess::Init(container_manager_.get(), evaluator_manager_.get(),
                             predictor_manager_.get(), prediction_conf)) {
-    AINFO << "INIT FAILED";
     return false;
   }
-  AINFO << "INIT IS DONE";
+
   planning_reader_ = node_->CreateReader<ADCTrajectory>(
       prediction_conf.topic_conf().planning_trajectory_topic(), nullptr);
 
@@ -105,7 +98,7 @@ bool PredictionComponent::Init() {
 
   prediction_writer_ = node_->CreateWriter<PredictionObstacles>(
       prediction_conf.topic_conf().prediction_topic());
-  AINFO << "CONTAINER WRITER111111111111";
+
   container_writer_ = node_->CreateWriter<SubmoduleOutput>(
       prediction_conf.topic_conf().container_topic_name());
 
@@ -114,7 +107,7 @@ bool PredictionComponent::Init() {
 
   perception_obstacles_writer_ = node_->CreateWriter<PerceptionObstacles>(
       prediction_conf.topic_conf().perception_obstacles_topic_name());
-  AINFO << "PREDICTION INIT IS DONE";
+
   return true;
 }
 
@@ -183,7 +176,6 @@ bool PredictionComponent::ContainerSubmoduleProcess(
 
 bool PredictionComponent::PredictionEndToEndProc(
     const std::shared_ptr<PerceptionObstacles>& perception_obstacles) {
-  AINFO << "~~~~~~~~~~~PREDICTION PROC STRAT~~~~~~~~~~~~";
   if (FLAGS_prediction_test_mode &&
       (Clock::NowInSeconds() - component_start_time_ >
        FLAGS_prediction_test_duration)) {
@@ -237,13 +229,11 @@ bool PredictionComponent::PredictionEndToEndProc(
 
   // Get all perception_obstacles of this frame and call OnPerception to
   // process them all.
-  AINFO << "****************PROCESS OBSTACLES PREDICTION~~~~~~~~~~~~~";
   auto perception_msg = *perception_obstacles;
   PredictionObstacles prediction_obstacles;
   MessageProcess::OnPerception(
       perception_msg, container_manager_, evaluator_manager_.get(),
       predictor_manager_.get(), scenario_manager_.get(), &prediction_obstacles);
-  AINFO << "@@@@@@@@@@@@@@@@OBSTACLE PREDICTION IS DONE@@@@@@@@@@@@@@";
   auto end_time4 = std::chrono::system_clock::now();
   diff = end_time4 - end_time3;
   ADEBUG << "Time for updating PerceptionContainer: " << diff.count() * 1000

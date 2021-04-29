@@ -119,19 +119,18 @@ void EvaluatorManager::Init(const PredictionConf& config) {
 
   for (const auto& obstacle_conf : config.obstacle_conf()) {
     if (!obstacle_conf.has_obstacle_type()) {
-      AINFO << "Obstacle config [" << obstacle_conf.ShortDebugString()
+      AERROR << "Obstacle config [" << obstacle_conf.ShortDebugString()
              << "] has not defined obstacle type.";
       continue;
     }
 
     if (!obstacle_conf.has_evaluator_type()) {
-      AINFO << "Obstacle config [" << obstacle_conf.ShortDebugString()
+      ADEBUG << "Obstacle config [" << obstacle_conf.ShortDebugString()
              << "] has not defined evaluator type.";
       continue;
     }
 
     if (obstacle_conf.has_obstacle_status()) {
-      AINFO << "HAS OBSTACLE STATUS";
       switch (obstacle_conf.obstacle_type()) {
         case PerceptionObstacle::VEHICLE: {
           if (obstacle_conf.obstacle_status() == ObstacleConf::ON_LANE) {
@@ -177,7 +176,6 @@ void EvaluatorManager::Init(const PredictionConf& config) {
         }
       }
     } else if (obstacle_conf.has_interactive_tag()) {
-      AINFO << "INTERACTION WILL BE USED";
       interaction_evaluator_ = obstacle_conf.evaluator_type();
     }
   }
@@ -196,7 +194,9 @@ Evaluator* EvaluatorManager::GetEvaluator(
   return it != evaluators_.end() ? it->second.get() : nullptr;
 }
 
-void EvaluatorManager::Run(ObstaclesContainer* obstacles_container) {
+void EvaluatorManager::Run(
+    const ADCTrajectoryContainer* adc_trajectory_container,
+    ObstaclesContainer* obstacles_container) {
   if (FLAGS_enable_semantic_map ||
       FLAGS_prediction_offline_mode == PredictionConstants::kDumpFrameEnv) {
     size_t max_num_frame = 10;
@@ -212,7 +212,6 @@ void EvaluatorManager::Run(ObstaclesContainer* obstacles_container) {
   }
 
   std::vector<Obstacle*> dynamic_env;
-  ADCTrajectoryContainer* adc_trajectory_container;
 
   if (FLAGS_enable_multi_thread) {
     IdObstacleListMap id_obstacle_map;
@@ -335,7 +334,7 @@ void EvaluatorManager::EvaluateObstacle(
 void EvaluatorManager::EvaluateObstacle(
     Obstacle* obstacle, ObstaclesContainer* obstacles_container) {
   std::vector<Obstacle*> dummy_dynamic_env;
-  ADCTrajectoryContainer* adc_trajectory_container;
+  ADCTrajectoryContainer* adc_trajectory_container = nullptr;
   EvaluateObstacle(adc_trajectory_container, obstacle,
                    obstacles_container, dummy_dynamic_env);
 }

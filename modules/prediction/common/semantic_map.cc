@@ -356,7 +356,7 @@ void SemanticMap::DrawADCTrajectory(const cv::Scalar& color,
   for (size_t i = 0; i < traj_num; ++i) {
     double time_decay = ego_feature_.adc_trajectory_point(i).relative_time() -
                         ego_feature_.adc_trajectory_point(0).relative_time();
-    cv::Scalar decay_color = color * time_decay;                                
+    cv::Scalar decay_color = color * time_decay;
     DrawPoly(ego_feature_, decay_color, base_x, base_y, img);
   }
 }

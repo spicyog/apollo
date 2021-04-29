@@ -81,7 +81,7 @@ class SemanticMap {
 
   // Draw adc trajectory in semantic map
   void DrawADCTrajectory(const cv::Scalar& color, const double base_x,
-                         const double base_y, cv::Mat* img);                 
+                         const double base_y, cv::Mat* img);
 
   cv::Mat CropArea(const cv::Mat& input_img, const cv::Point2i& center_point,
                    const double heading);
