@@ -303,6 +303,10 @@
                   "type": "apollo.prediction.ObstaclePriority",
                   "id": 33
                 },
+                "interactiveTag": {
+                  "type": "apollo.prediction.ObstacleInteractiveTag",
+                  "id": 40
+                },
                 "source": {
                   "type": "apollo.perception.PerceptionObstacle.Source",
                   "id": 36,
@@ -11795,6 +11799,25 @@
                 }
               }
             },
+            "ObstacleInteractiveTag": {
+              "fields": {
+                "interactiveTag": {
+                  "type": "InteractiveTag",
+                  "id": 37,
+                  "options": {
+                    "default": "NONINTERACTION"
+                  }
+                }
+              },
+              "nested": {
+                "InteractiveTag": {
+                  "values": {
+                    "INTERACTION": 1,
+                    "NONINTERACTION": 2
+                  }
+                }
+              }
+            },
             "Trajectory": {
               "fields": {
                 "probability": {
@@ -11940,6 +11963,10 @@
                 "priority": {
                   "type": "ObstaclePriority",
                   "id": 25
+                },
+                "interactiveTag": {
+                  "type": "ObstacleInteractiveTag",
+                  "id": 37
                 },
                 "isNearJunction": {
                   "type": "bool",
@@ -12445,6 +12472,10 @@
                 "priority": {
                   "type": "ObstaclePriority",
                   "id": 6
+                },
+                "interactiveTag": {
+                  "type": "ObstacleInteractiveTag",
+                  "id": 9
                 },
                 "isStatic": {
                   "type": "bool",
