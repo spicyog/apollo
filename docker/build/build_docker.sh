@@ -36,6 +36,7 @@ USE_CACHE=1
 DRY_RUN_ONLY=0
 
 function check_experimental_docker() {
+    local daemon_cfg="/etc/docker/daemon.json"
     local enabled="$(docker version -f '{{.Server.Experimental}}')"
     if [ "${enabled}" != "true" ]; then
         echo "Experimental features should be enabled to run Apollo docker build."
@@ -138,7 +139,7 @@ function determine_prev_image_timestamp() {
             fi
         elif [[ "${stage}" == "runtime" ]]; then
             if [[ "${dist}" == "stable" ]]; then
-                result="20210426_0123"
+                result="20210517_1712"
             fi
         fi
     else # aarch64
