@@ -157,9 +157,6 @@ void MessageProcess::ContainerProcess(
   // Ignore some obstacles
   obstacles_prioritizer.AssignIgnoreLevel();
 
-  // Add interactive tag
-  interaction_filter.AssignInteractiveTag();
-
   // Scenario analysis
   scenario_manager->Run(container_manager.get());
 
@@ -176,6 +173,9 @@ void MessageProcess::ContainerProcess(
 
   // Assign CautionLevel for obstacles
   obstacles_prioritizer.AssignCautionLevel();
+
+  // Add interactive tag
+  interaction_filter.AssignInteractiveTag();
 
   // Analyze RightOfWay for the caution obstacles
   RightOfWay::Analyze(container_manager.get());
@@ -214,10 +214,14 @@ void MessageProcess::OnPerception(
       }
       // TODO(all): the adc trajectory should be part of features for learning
       //            algorithms rather than part of the feature.proto
-      /*
       *obstacle_ptr->mutable_latest_feature()->mutable_adc_trajectory_point() =
           ptr_ego_trajectory_container->adc_trajectory().trajectory_point();
-      */
+
+      // adc trajectory timestamp
+      obstacle_ptr->mutable_latest_feature()->set_adc_timestamp(
+          ptr_ego_trajectory_container->adc_trajectory()
+          .header().timestamp_sec());
+
       FeatureOutput::InsertFeatureProto(obstacle_ptr->latest_feature());
       ADEBUG << "Insert feature into feature output";
     }
